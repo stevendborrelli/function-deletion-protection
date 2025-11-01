@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -125,7 +124,7 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 	return rsp, nil
 }
 
-// ProtectXR determines is a Composite Resource requires deletion protection
+// ProtectXR determines is a Composite Resource requires deletion protection.
 func ProtectXR(dc *composite.Unstructured) bool {
 	labels := dc.GetLabels()
 	val, ok := labels[ProtectionLabelBlockDeletion]
@@ -141,7 +140,7 @@ func ProtectResource(dc *composed.Unstructured, label string) bool {
 	return MatchLabel(dc, label)
 }
 
-// MatchLabel determines if a Resource's label is both set and set to true
+// MatchLabel determines if a Resource's label is both set and set to true.
 func MatchLabel(u *composed.Unstructured, label string) bool {
 	if u.Object == nil {
 		return false
@@ -159,9 +158,9 @@ func MatchLabel(u *composed.Unstructured, label string) bool {
 	return false
 }
 
-// GenerateUsage creates a Usage for a desired composed resource
+// GenerateUsage creates a Usage for a desired Composed resource.
 func GenerateUsage(u *composed.Unstructured) map[string]any {
-	var usageType = protectionv1beta1.UsageKind
+	usageType := protectionv1beta1.UsageKind
 	var resourceRef map[string]any
 	namespace := u.GetNamespace()
 
@@ -188,15 +187,15 @@ func GenerateUsage(u *composed.Unstructured) map[string]any {
 				"kind":        u.GetKind(),
 				"resourceRef": resourceRef,
 			},
-			"reason": fmt.Sprintf(ProtectionReason),
+			"reason": ProtectionReason,
 		},
 	}
 	return usage
 }
 
-// GenerateUsage creates a Usage for a desired Composite resource
+// GenerateUsage creates a Usage for a desired Composite resource.
 func GenerateXRUsage(u *composite.Unstructured) map[string]any {
-	var usageType = protectionv1beta1.UsageKind
+	usageType := protectionv1beta1.UsageKind
 	var resourceRef map[string]any
 	namespace := u.GetNamespace()
 
@@ -223,7 +222,7 @@ func GenerateXRUsage(u *composite.Unstructured) map[string]any {
 				"kind":        u.GetKind(),
 				"resourceRef": resourceRef,
 			},
-			"reason": fmt.Sprintf(ProtectionReason),
+			"reason": ProtectionReason,
 		},
 	}
 	return usage
