@@ -28,6 +28,13 @@ spec:
               may reject unrecognized values.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
+          cacheTTL:
+            default: 1m
+            description: |-
+              TTL for response cache. Function Response caching is an
+              alpha feature in Crossplane can be deprecated or changed
+              in the future.
+            type: string
           kind:
             description: |-
               Kind is a string value representing the REST resource this object represents.
@@ -38,6 +45,8 @@ spec:
             type: string
           metadata:
             type: object
+        required:
+        - metadata
         type: object
     served: true
     storage: true
