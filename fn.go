@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
 	protectionv1beta1 "github.com/crossplane/crossplane/v2/apis/protection/v1beta1"
 	v1beta1 "github.com/upboundcare/function-deletion-protection/input/v1beta1"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -91,7 +90,7 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 		if observed, ok := observedComposed[name]; ok {
 			desired.Resource.GetObjectKind()
 			// The label can either be defined in the pipeline or applied out-of-band
-			if ProtectResource(desired.Resource, ProtectionLabelBlockDeletion) || ProtectResource(observed.Resource, ProtectionLabelBlockDeletion) {
+			if ProtectResource(desired.Resource) || ProtectResource(observed.Resource) {
 				f.log.Debug("protecting Composed resource", "name", name)
 				usage := GenerateUsage(observed.Resource.DeepCopy())
 				usageComposed := composed.New()
@@ -126,7 +125,7 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 		response.Fatal(rsp, errors.Wrap(err, "cannot set desired resources"))
 		return rsp, nil
 	}
-	f.log.Debug("protections generaged", "number")
+	f.log.Debug("protections generated", "number")
 
 	return rsp, nil
 }
@@ -138,30 +137,19 @@ func ProtectXR(dc *composite.Unstructured) bool {
 	if ok && strings.EqualFold(val, "true") {
 		return true
 	}
-
 	return false
 }
 
 // ProtectResource determines if a Composed Resource should be protected.
-func ProtectResource(dc *composed.Unstructured, label string) bool {
-	return MatchLabel(dc, label)
-}
-
-// MatchLabel determines if a Resource's label is both set and set to true.
-func MatchLabel(u *composed.Unstructured, label string) bool {
+func ProtectResource(u *composed.Unstructured) bool {
 	if u.Object == nil {
 		return false
 	}
-	var labels map[string]any
-	err := fieldpath.Pave(u.Object).GetValueInto("metadata.labels", &labels)
-	if err != nil {
-		return false
-	}
-	val, ok := labels[label].(string)
+	labels := u.GetLabels()
+	val, ok := labels[ProtectionLabelBlockDeletion]
 	if ok && strings.EqualFold(val, "true") {
 		return true
 	}
-
 	return false
 }
 

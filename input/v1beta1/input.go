@@ -20,10 +20,10 @@ import (
 // +kubebuilder:resource:categories=crossplane
 type Input struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
 	// TTL for response cache. Function Response caching is an
-	// alpha feature in Crossplane can be deprecated or changed
+	// alpha feature in Crossplane and can be deprecated or changed
 	// in the future.
 	// +optional
 	// +kubebuilder:default:="1m"
