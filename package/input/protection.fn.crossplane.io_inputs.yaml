@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: inputs.template.fn.crossplane.io
+  name: inputs.protection.fn.crossplane.io
 spec:
-  group: template.fn.crossplane.io
+  group: protection.fn.crossplane.io
   names:
     categories:
     - crossplane
@@ -28,9 +28,12 @@ spec:
               may reject unrecognized values.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
-          example:
-            description: Example is an example field. Replace it with whatever input
-              you need. :)
+          cacheTTL:
+            default: 1m
+            description: |-
+              TTL for response cache. Function Response caching is an
+              alpha feature in Crossplane can be deprecated or changed
+              in the future.
             type: string
           kind:
             description: |-
@@ -43,7 +46,7 @@ spec:
           metadata:
             type: object
         required:
-        - example
+        - metadata
         type: object
     served: true
     storage: true

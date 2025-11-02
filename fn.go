@@ -2,22 +2,37 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
+	"time"
+
+	protectionv1beta1 "github.com/crossplane/crossplane/v2/apis/protection/v1beta1"
+	v1beta1 "github.com/upboundcare/function-deletion-protection/input/v1beta1"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/crossplane/function-sdk-go/errors"
 	"github.com/crossplane/function-sdk-go/logging"
 	fnv1 "github.com/crossplane/function-sdk-go/proto/v1"
 	"github.com/crossplane/function-sdk-go/request"
+	"github.com/crossplane/function-sdk-go/resource"
+	"github.com/crossplane/function-sdk-go/resource/composed"
 	"github.com/crossplane/function-sdk-go/response"
-
-	"github.com/crossplane/function-template-go/input/v1beta1"
 )
 
-// Function returns whatever response you ask it to.
 type Function struct {
 	fnv1.UnimplementedFunctionRunnerServiceServer
 
 	log logging.Logger
 }
+
+const (
+	ProtectionLabelBlockDeletion = "protection.fn.crossplane.io/block-deletion"
+	ProtectionGroupVersion       = protectionv1beta1.Group + "/" + protectionv1beta1.Version
+	ProtectionReason             = "created by function-deletion-protection via label " + ProtectionLabelBlockDeletion
+	// UsageNameSuffix is the suffix applied when generating Usage names.
+	UsageNameSuffix = "fn-protection"
+)
 
 // RunFunction runs the Function.
 func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) (*fnv1.RunFunctionResponse, error) {
@@ -27,35 +42,140 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 
 	in := &v1beta1.Input{}
 	if err := request.GetInput(req, in); err != nil {
-		// You can set a custom status condition on the claim. This allows you to
-		// communicate with the user. See the link below for status condition
-		// guidance.
-		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-		response.ConditionFalse(rsp, "FunctionSuccess", "InternalError").
-			WithMessage("Something went wrong.").
-			TargetCompositeAndClaim()
-
-		// You can emit an event regarding the claim. This allows you to communicate
-		// with the user. Note that events should be used sparingly and are subject
-		// to throttling; see the issue below for more information.
-		// https://github.com/crossplane/crossplane/issues/5802
-		response.Warning(rsp, errors.New("something went wrong")).
-			TargetCompositeAndClaim()
-
 		response.Fatal(rsp, errors.Wrapf(err, "cannot get Function input from %T", req))
 		return rsp, nil
 	}
+	if in.CacheTTL != "" {
+		dur, err := time.ParseDuration(in.CacheTTL)
+		if err != nil {
+			response.Fatal(rsp, errors.Wrapf(err, "cannot set cacheTTL"))
+			return rsp, nil
+		}
+		rsp.Meta.Ttl = durationpb.New(dur)
+	}
 
-	// TODO: Add your Function logic here!
-	response.Normalf(rsp, "I was run with input %q!", in.Example)
-	f.log.Info("I was run!", "input", in.Example)
+	desiredComposite, err := request.GetDesiredCompositeResource(req)
+	if err != nil {
+		response.Fatal(rsp, errors.Wrap(err, "cannot get desired composite"))
+		return rsp, nil
+	}
 
-	// You can set a custom status condition on the claim. This allows you to
-	// communicate with the user. See the link below for status condition
-	// guidance.
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-	response.ConditionTrue(rsp, "FunctionSuccess", "Success").
-		TargetCompositeAndClaim()
+	observedComposite, err := request.GetObservedCompositeResource(req)
+	if err != nil {
+		response.Fatal(rsp, errors.Wrap(err, "cannot get observed composite"))
+		return rsp, nil
+	}
+
+	observedComposed, err := request.GetObservedComposedResources(req)
+	if err != nil {
+		response.Fatal(rsp, errors.Wrap(err, "cannot get observed resources"))
+		return rsp, nil
+	}
+
+	desiredComposed, err := request.GetDesiredComposedResources(req)
+	if err != nil {
+		response.Fatal(rsp, errors.Wrapf(err, "cannot get desired composed resources from %T", req))
+		return rsp, nil
+	}
+	var protectedCount int
+	for name, desired := range desiredComposed {
+		// A Usage will be created if there is an Observed Resource on the Cluster
+		if observed, ok := observedComposed[name]; ok {
+			// The label can either be defined in the pipeline or applied outside of Crossplane
+			if ProtectResource(&desired.Resource.DeepCopy().Unstructured) || ProtectResource(&observed.Resource.DeepCopy().Unstructured) {
+				f.log.Debug("protecting Composed resource", "name", name)
+				usage := GenerateUsage(&observed.Resource.DeepCopy().Unstructured)
+				usageComposed := composed.New()
+				if err := convertViaJSON(usageComposed, usage); err != nil {
+					response.Fatal(rsp, errors.Wrap(err, "cannot convert usage to unstructured"))
+					return rsp, nil
+				}
+				f.log.Debug("creating usage", "kind", usageComposed.GetKind(), "name", usageComposed.GetName(), "namespace", usageComposed.GetNamespace())
+				protectedCount++
+				desiredComposed[name+"-usage"] = &resource.DesiredComposed{Resource: usageComposed}
+			}
+		}
+	}
+
+	// Create a Usage on the Composite:
+	// - If any resources in the Composition are being protected
+	// - If the Composite has the label
+	if ProtectResource(&observedComposite.Resource.DeepCopy().Unstructured) || ProtectResource(&desiredComposite.Resource.DeepCopy().Unstructured) || protectedCount > 0 {
+		f.log.Debug("protecting Composite", "name", observedComposite.Resource.GetName())
+		usage := GenerateUsage(&observedComposite.Resource.Unstructured)
+		usageComposed := composed.New()
+		if err := convertViaJSON(usageComposed, usage); err != nil {
+			response.Fatal(rsp, errors.Wrap(err, "cannot convert usage to unstructured"))
+			return rsp, nil
+		}
+		uname := strings.ToLower("xr-" + observedComposite.Resource.GetName() + "-usage")
+		desiredComposed[resource.Name(uname)] = &resource.DesiredComposed{Resource: usageComposed}
+		f.log.Debug("creating usage", "kind", usageComposed.GetKind(), "name", usageComposed.GetName(), "namespace", usageComposed.GetNamespace())
+	}
+
+	// requiredResources, err := request.GetRequiredResources(req)
+	// if err != nil {
+	// 	response.Fatal(rsp, errors.Wrap(err, "cannot get required resources"))
+	// 	return rsp, nil
+	// }
+
+	if err := response.SetDesiredComposedResources(rsp, desiredComposed); err != nil {
+		response.Fatal(rsp, errors.Wrap(err, "cannot set desired resources"))
+		return rsp, nil
+	}
+	f.log.Debug("protections generated", "number", protectedCount)
 
 	return rsp, nil
+}
+
+// ProtectResource determines if a Resource requires deletion protection.
+func ProtectResource(u *unstructured.Unstructured) bool {
+	if u == nil || u.Object == nil {
+		return false
+	}
+	labels := u.GetLabels()
+	val, ok := labels[ProtectionLabelBlockDeletion]
+	if ok && strings.EqualFold(val, "true") {
+		return true
+	}
+	return false
+}
+
+// GenerateUsage creates a Usage for a desired Composed resource.
+func GenerateUsage(u *unstructured.Unstructured) map[string]any {
+	usageType := protectionv1beta1.ClusterUsageKind
+	usageMeta := map[string]any{
+		"name": GenerateName(u.GetName(), UsageNameSuffix),
+	}
+
+	namespace := u.GetNamespace()
+	if namespace != "" {
+		usageType = protectionv1beta1.UsageKind
+		usageMeta["namespace"] = namespace
+	}
+
+	usage := map[string]any{
+		"apiVersion": ProtectionGroupVersion,
+		"kind":       usageType,
+		"metadata":   usageMeta,
+		"spec": map[string]any{
+			"of": map[string]any{
+				"apiVersion": u.GetAPIVersion(),
+				"kind":       u.GetKind(),
+				"resourceRef": map[string]any{
+					"name": u.GetName(),
+				},
+			},
+			"reason": ProtectionReason,
+		},
+	}
+	return usage
+}
+
+func convertViaJSON(to, from any) error {
+	bs, err := json.Marshal(from)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bs, to)
 }

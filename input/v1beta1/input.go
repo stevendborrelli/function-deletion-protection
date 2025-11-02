@@ -1,6 +1,6 @@
 // Package v1beta1 contains the input type for this Function
 // +kubebuilder:object:generate=true
-// +groupName=template.fn.crossplane.io
+// +groupName=protection.fn.crossplane.io
 // +versionName=v1beta1
 package v1beta1
 
@@ -20,8 +20,12 @@ import (
 // +kubebuilder:resource:categories=crossplane
 type Input struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	// Example is an example field. Replace it with whatever input you need. :)
-	Example string `json:"example"`
+	// TTL for response cache. Function Response caching is an
+	// alpha feature in Crossplane and can be deprecated or changed
+	// in the future.
+	// +optional
+	// +kubebuilder:default:="1m"
+	CacheTTL string `json:"cacheTTL,omitempty"`
 }
