@@ -1,8 +1,8 @@
 # function-deletion-protection
 
-A Crossplane Composition Function that adds deletion protection to resources by creating `ClusterUsage` or `Usage` objects when resources are labeled with `protection.fn.crossplane.io/block-deletion: "true"`.
+A Crossplane Composition Function that adds blocks deletion of resources by creating `ClusterUsage` or `Usage` objects when resources are labeled with `protection.fn.crossplane.io/block-deletion: "true"`.
 
-The Usage will block deletion requests 
+The Usage will block deletion requests. See [Usages](https://docs.crossplane.io/latest/managed-resources/usages/) for more information.
 
 This function requires Crossplane version 2.0 or higher, which includes the new `protection.crossplane.io` API Group.
 
@@ -31,7 +31,7 @@ The function will generate a `ClusterUsage`
 apiVersion: protection.crossplane.io/v1beta1
 kind: ClusterUsage
 metadata:
-  name: vpc-my-vpc-fn-protection
+  name: my-vpc-2a782e-fn-protection
 spec:
   of:
     apiVersion: ec2.aws.upbound.io/v1beta1
@@ -39,16 +39,19 @@ spec:
     resourceRef:
       name: my-vpc
   reason: created by function-deletion-protection via label protection.fn.crossplane.io/block-deletion
-
 ```
 
 If a resource is Cluster-scoped, a `ClusterUsage` will be generated. If Namespaced a `Usage` will be created in the Resource's namespace.
+
+The label can be applied to the resource in the Composition (the "Desired" state), or it can be applied to the
+Resource in the cluster (the "Observed" state). If the Desired and Observed labels conflict, the function will
+default to creating the Usage.
 
 ## Installation
 
 The function can be installed in a Crossplane [Composition Pipeline](https://docs.crossplane.io/latest/composition/compositions/).
 
-The only setting is `cacheTTL`, which configures the alpha Function Response Cache.
+The only setting is `cacheTTL`, which configures the [Function Response Cache](https://docs.crossplane.io/latest/operations/operation/#function-response-cache).
 
 ```yaml
     - step: protect-resources
@@ -66,7 +69,7 @@ To build the Docker image for both arm64 and amd64 and save the results
 in a `tar` file, run:
 
 ```shell
-export VERSION=0.1.3
+export VERSION=0.2.0
 # Build the function's runtime image
 $ docker buildx build --platform linux/amd64,linux/arm64 . --output type=oci,dest=function-deletion-protection-runtime-v${VERSION}.tar
 ```
@@ -74,6 +77,6 @@ $ docker buildx build --platform linux/amd64,linux/arm64 . --output type=oci,des
 Next, build the Crossplane Package:
 
 ```shell
-export VERSION=0.1.3
+export VERSION=0.2.0
 crossplane xpkg build -f package --embed-runtime-image-tarball=function-deletion-protection-runtime-v${VERSION}.tar -o function-deletion-protection-v${VERSION}.xpkg
 ```
