@@ -263,7 +263,7 @@ func TestRunFunction(t *testing.T) {
 									"apiVersion": "protection.crossplane.io/v1beta1",
 									"kind": "ClusterUsage",
 									"metadata": {
-										"name": "my-test-xr-function-protection"
+										"name": "my-test-xr-fn-protection"
 									},
 									"spec": {
 										"of": {
@@ -404,7 +404,7 @@ func TestRunFunction(t *testing.T) {
 									"apiVersion": "protection.crossplane.io/v1beta1",
 									"kind": "ClusterUsage",
 									"metadata": {
-										"name": "my-test-xr-function-protection"
+										"name": "my-test-xr-fn-protection"
 									},
 									"spec": {
 										"of": {

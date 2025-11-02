@@ -9,6 +9,7 @@ import (
 	protectionv1beta1 "github.com/crossplane/crossplane/v2/apis/protection/v1beta1"
 	v1beta1 "github.com/upboundcare/function-deletion-protection/input/v1beta1"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/crossplane/function-sdk-go/errors"
 	"github.com/crossplane/function-sdk-go/logging"
@@ -16,7 +17,6 @@ import (
 	"github.com/crossplane/function-sdk-go/request"
 	"github.com/crossplane/function-sdk-go/resource"
 	"github.com/crossplane/function-sdk-go/resource/composed"
-	"github.com/crossplane/function-sdk-go/resource/composite"
 	"github.com/crossplane/function-sdk-go/response"
 )
 
@@ -65,14 +65,12 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 		return rsp, nil
 	}
 
-	// Get observed composed resources to extract any that need to be protected
 	observedComposed, err := request.GetObservedComposedResources(req)
 	if err != nil {
 		response.Fatal(rsp, errors.Wrap(err, "cannot get observed resources"))
 		return rsp, nil
 	}
 
-	// The composed resources desired by any previous Functions in the pipeline.
 	desiredComposed, err := request.GetDesiredComposedResources(req)
 	if err != nil {
 		response.Fatal(rsp, errors.Wrapf(err, "cannot get desired composed resources from %T", req))
@@ -80,12 +78,12 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 	}
 	var protectedCount int
 	for name, desired := range desiredComposed {
-		// Does an Observed Resource Exist?
+		// A Usage will be created if there is an Observed Resource on the Cluster
 		if observed, ok := observedComposed[name]; ok {
-			// The label can either be defined in the pipeline or applied out-of-band
-			if ProtectResource(desired.Resource) || ProtectResource(observed.Resource) {
+			// The label can either be defined in the pipeline or applied outside of Crossplane
+			if ProtectResource(&desired.Resource.DeepCopy().Unstructured) || ProtectResource(&observed.Resource.DeepCopy().Unstructured) {
 				f.log.Debug("protecting Composed resource", "name", name)
-				usage := GenerateUsage(observed.Resource.DeepCopy())
+				usage := GenerateUsage(&observed.Resource.DeepCopy().Unstructured)
 				usageComposed := composed.New()
 				if err := convertViaJSON(usageComposed, usage); err != nil {
 					response.Fatal(rsp, errors.Wrap(err, "cannot convert usage to unstructured"))
@@ -102,9 +100,9 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 	// Create a Usage on the Composite:
 	// - If any resources in the Composition are being protected
 	// - If the Composite has the label
-	if ProtectXR(observedComposite.Resource) || ProtectXR(desiredComposite.Resource) || protectedCount > 0 {
+	if ProtectResource(&observedComposite.Resource.DeepCopy().Unstructured) || ProtectResource(&desiredComposite.Resource.DeepCopy().Unstructured) || protectedCount > 0 {
 		f.log.Debug("protecting Composite", "name", observedComposite.Resource.GetName())
-		usage := GenerateXRUsage(observedComposite.Resource.DeepCopy())
+		usage := GenerateUsage(&observedComposite.Resource.Unstructured)
 		usageComposed := composed.New()
 		if err := convertViaJSON(usageComposed, usage); err != nil {
 			response.Fatal(rsp, errors.Wrap(err, "cannot convert usage to unstructured"))
@@ -129,21 +127,8 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 	return rsp, nil
 }
 
-// ProtectXR determines is a Composite Resource requires deletion protection.
-func ProtectXR(u *composite.Unstructured) bool {
-	if u == nil || u.Object == nil {
-		return false
-	}
-	labels := u.GetLabels()
-	val, ok := labels[ProtectionLabelBlockDeletion]
-	if ok && strings.EqualFold(val, "true") {
-		return true
-	}
-	return false
-}
-
-// ProtectResource determines if a Composed Resource should be protected.
-func ProtectResource(u *composed.Unstructured) bool {
+// ProtectResource determines if a Resource requires deletion protection.
+func ProtectResource(u *unstructured.Unstructured) bool {
 	if u == nil || u.Object == nil {
 		return false
 	}
@@ -156,7 +141,7 @@ func ProtectResource(u *composed.Unstructured) bool {
 }
 
 // GenerateUsage creates a Usage for a desired Composed resource.
-func GenerateUsage(u *composed.Unstructured) map[string]any {
+func GenerateUsage(u *unstructured.Unstructured) map[string]any {
 	usageType := protectionv1beta1.UsageKind
 	var resourceRef map[string]any
 	namespace := u.GetNamespace()
@@ -177,41 +162,6 @@ func GenerateUsage(u *composed.Unstructured) map[string]any {
 		"kind":       usageType,
 		"metadata": map[string]any{
 			"name": u.GetName() + "-fn-protection",
-		},
-		"spec": map[string]any{
-			"of": map[string]any{
-				"apiVersion":  u.GetAPIVersion(),
-				"kind":        u.GetKind(),
-				"resourceRef": resourceRef,
-			},
-			"reason": ProtectionReason,
-		},
-	}
-	return usage
-}
-
-// GenerateXRUsage creates a Usage for a desired Composite resource.
-func GenerateXRUsage(u *composite.Unstructured) map[string]any {
-	usageType := protectionv1beta1.UsageKind
-	var resourceRef map[string]any
-	namespace := u.GetNamespace()
-
-	if namespace == "" {
-		usageType = protectionv1beta1.ClusterUsageKind
-		resourceRef = map[string]any{
-			"name": u.GetName(),
-		}
-	} else {
-		resourceRef = map[string]any{
-			"name":      u.GetName(),
-			"namespace": u.GetNamespace(),
-		}
-	}
-	usage := map[string]any{
-		"apiVersion": ProtectionGroupVersion,
-		"kind":       usageType,
-		"metadata": map[string]any{
-			"name": u.GetName() + "-function-protection",
 		},
 		"spec": map[string]any{
 			"of": map[string]any{
