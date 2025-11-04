@@ -4,7 +4,8 @@ A Crossplane Composition Function that adds blocks deletion of resources by crea
 
 The Usage will block deletion requests. See [Usages](https://docs.crossplane.io/latest/managed-resources/usages/) for more information.
 
-This function requires Crossplane version 2.0 or higher, which includes the new `protection.crossplane.io` API Group.
+By default v2 Usages are created using the `protection.crossplane.io` API Group in Crossplane version 2.0 or higher. The function has the ability to generate v1 Usages by setting `enableV1Mode: true` in the
+function `Input`.
 
 ## Overview
 
@@ -51,7 +52,9 @@ default to creating the Usage.
 
 The function can be installed in a Crossplane [Composition Pipeline](https://docs.crossplane.io/latest/composition/compositions/).
 
-The only setting is `cacheTTL`, which configures the [Function Response Cache](https://docs.crossplane.io/latest/operations/operation/#function-response-cache).
+### Function Customization
+
+Setting `cacheTTL`, configures the [Function Response Cache](https://docs.crossplane.io/latest/operations/operation/#function-response-cache). This can reduce the number of times the function is called.
 
 ```yaml
     - step: protect-resources
@@ -61,6 +64,31 @@ The only setting is `cacheTTL`, which configures the [Function Response Cache](h
         apiVersion: protection.fn.crossplane.io/v1beta1
         kind: Input
         cacheTTL: 10m
+```
+
+### Creating Crossplane V1 Usages
+
+There is a Compatibility mode for generating Crossplane v1 Usages by setting `enableV1Mode: true`
+in the Function's input. When this setting is enabled, v1 Usages will be created. Please note that
+this feature will be removed when upstream Crossplane deprecates v1 APIs.
+
+```yaml
+    - step: protect-resources
+      functionRef:
+        name: crossplane-contrib-function-protection
+      input:
+        apiVersion: protection.fn.crossplane.io/v1beta1
+        kind: Input
+        enableV1Mode: true
+```
+
+Will generate a v1 Cluster-scoped `Usage` using the `apiextensions.crossplane.io/v1beta1` API Group:
+
+```yaml
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind": Usage
+metadata:
+  name: ...
 ```
 
 ## Building

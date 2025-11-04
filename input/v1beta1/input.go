@@ -22,10 +22,17 @@ type Input struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// TTL for response cache. Function Response caching is an
+	// CacheTTL sets the time-to-live for the Function Response caching is an
 	// alpha feature in Crossplane and can be deprecated or changed
 	// in the future.
 	// +optional
 	// +kubebuilder:default:="1m"
 	CacheTTL string `json:"cacheTTL,omitempty"`
+
+	// EnableV1Mode if enabled generate v1 Crossplane Usages
+	// By default v2 Usages and Cluster Usages are generated
+	// Support for v1 Usages will be removed in a future version.
+	// +optional
+	// +kubebuilder:default:=false
+	EnableV1Mode bool `json:"enableV1Mode,omitempty"`
 }

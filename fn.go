@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	apiextensionsv1beta1 "github.com/crossplane/crossplane/v2/apis/apiextensions/v1beta1"
 	protectionv1beta1 "github.com/crossplane/crossplane/v2/apis/protection/v1beta1"
 	v1beta1 "github.com/upboundcare/function-deletion-protection/input/v1beta1"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -30,6 +31,7 @@ const (
 	ProtectionLabelBlockDeletion = "protection.fn.crossplane.io/block-deletion"
 	ProtectionGroupVersion       = protectionv1beta1.Group + "/" + protectionv1beta1.Version
 	ProtectionReason             = "created by function-deletion-protection via label " + ProtectionLabelBlockDeletion
+	ProtectionV1GroupVersion     = apiextensionsv1beta1.Group + "/" + apiextensionsv1beta1.Version
 	// UsageNameSuffix is the suffix applied when generating Usage names.
 	UsageNameSuffix = "fn-protection"
 )
@@ -84,7 +86,7 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 			// The label can either be defined in the pipeline or applied outside of Crossplane
 			if ProtectResource(&desired.Resource.DeepCopy().Unstructured) || ProtectResource(&observed.Resource.DeepCopy().Unstructured) {
 				f.log.Debug("protecting Composed resource", "name", name)
-				usage := GenerateUsage(&observed.Resource.DeepCopy().Unstructured)
+				usage := GenerateUsage(&desired.Resource.Unstructured, in.EnableV1Mode)
 				usageComposed := composed.New()
 				if err := convertViaJSON(usageComposed, usage); err != nil {
 					response.Fatal(rsp, errors.Wrap(err, "cannot convert usage to unstructured"))
@@ -102,7 +104,7 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 	// - If the Composite has the label
 	if ProtectResource(&observedComposite.Resource.DeepCopy().Unstructured) || ProtectResource(&desiredComposite.Resource.DeepCopy().Unstructured) || protectedCount > 0 {
 		f.log.Debug("protecting Composite", "name", observedComposite.Resource.GetName())
-		usage := GenerateUsage(&observedComposite.Resource.Unstructured)
+		usage := GenerateUsage(&observedComposite.Resource.DeepCopy().Unstructured, in.EnableV1Mode)
 		usageComposed := composed.New()
 		if err := convertViaJSON(usageComposed, usage); err != nil {
 			response.Fatal(rsp, errors.Wrap(err, "cannot convert usage to unstructured"))
@@ -141,8 +143,16 @@ func ProtectResource(u *unstructured.Unstructured) bool {
 	return false
 }
 
-// GenerateUsage creates a Usage for a desired Composed resource.
-func GenerateUsage(u *unstructured.Unstructured) map[string]any {
+// GenerateUsage determines whether to return a v1 or v2 Crossplane usage.
+func GenerateUsage(u *unstructured.Unstructured, createV1Usages bool) map[string]any {
+	if createV1Usages {
+		return GenerateV1Usage(u)
+	}
+	return GenerateV2Usage(u)
+}
+
+// GenerateV2Usage creates a v2 Usage for a resource.
+func GenerateV2Usage(u *unstructured.Unstructured) map[string]any {
 	usageType := protectionv1beta1.ClusterUsageKind
 	usageMeta := map[string]any{
 		"name": GenerateName(u.GetName(), UsageNameSuffix),
@@ -158,6 +168,29 @@ func GenerateUsage(u *unstructured.Unstructured) map[string]any {
 		"apiVersion": ProtectionGroupVersion,
 		"kind":       usageType,
 		"metadata":   usageMeta,
+		"spec": map[string]any{
+			"of": map[string]any{
+				"apiVersion": u.GetAPIVersion(),
+				"kind":       u.GetKind(),
+				"resourceRef": map[string]any{
+					"name": u.GetName(),
+				},
+			},
+			"reason": ProtectionReason,
+		},
+	}
+	return usage
+}
+
+// GenerateV1Usage creates a Crossplane v1 Usage for a resource.
+// Only Cluster Scoped Resources are supported.
+func GenerateV1Usage(u *unstructured.Unstructured) map[string]any {
+	usage := map[string]any{
+		"apiVersion": ProtectionV1GroupVersion,
+		"kind":       apiextensionsv1beta1.UsageKind,
+		"metadata": map[string]any{
+			"name": GenerateName(u.GetName(), UsageNameSuffix),
+		},
 		"spec": map[string]any{
 			"of": map[string]any{
 				"apiVersion": u.GetAPIVersion(),

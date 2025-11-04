@@ -31,10 +31,17 @@ spec:
           cacheTTL:
             default: 1m
             description: |-
-              TTL for response cache. Function Response caching is an
-              alpha feature in Crossplane can be deprecated or changed
+              CacheTTL sets the time-to-live for the Function Response caching is an
+              alpha feature in Crossplane and can be deprecated or changed
               in the future.
             type: string
+          enableV1Mode:
+            default: false
+            description: |-
+              EnableV1Mode if enabled generate v1 Crossplane Usages
+              By default v2 Usages and Cluster Usages are generated
+              Support for v1 Usages will be removed in a future version.
+            type: boolean
           kind:
             description: |-
               Kind is a string value representing the REST resource this object represents.
