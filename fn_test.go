@@ -905,6 +905,301 @@ func TestRunFunction(t *testing.T) {
 				},
 			},
 		},
+		"ProtectCompositeResourceWithV1Usage": {
+			reason: "V1 Usage Created for a Composite when EnableV1Mode is true",
+			args: args{
+				req: &fnv1.RunFunctionRequest{
+					Meta: &fnv1.RequestMeta{Tag: "hello"},
+					Input: resource.MustStructJSON(`{
+						"apiVersion": "template.fn.crossplane.io/v1beta1",
+						"kind": "Input",
+						"enableV1Mode": true
+					}`),
+					Desired: &fnv1.State{
+						Composite: &fnv1.Resource{
+							Resource: resource.MustStructJSON(`{
+								"apiVersion": "test.crossplane.io/v1",
+								"kind": "TestXR",
+								"metadata": {
+									"name": "my-test-xr",
+									"labels": {
+										"protection.fn.crossplane.io/block-deletion": "true"
+									}
+								}
+							}`),
+						},
+						Resources: map[string]*fnv1.Resource{
+							"ready-composed-resource": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "test.crossplane.io/v1",
+									"kind": "TestComposed",
+									"metadata": {
+										"name": "my-test-composed"
+									},
+									"spec": {},
+									"status": {
+										"conditions": [
+											{
+												"type": "Ready",
+												"status": "True"
+											}
+										]
+									}
+								}`),
+							},
+						},
+					},
+					Observed: &fnv1.State{
+						Composite: &fnv1.Resource{
+							Resource: resource.MustStructJSON(`{
+								"apiVersion": "test.crossplane.io/v1",
+								"kind": "TestXR",
+								"metadata": {
+									"name": "my-test-xr"
+								}
+							}`),
+						},
+						Resources: map[string]*fnv1.Resource{
+							"ready-composed-resource": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "test.crossplane.io/v1",
+									"kind": "TestComposed",
+									"metadata": {
+										"name": "my-test-composed"
+									},
+									"spec": {},
+									"status": {
+										"conditions": [
+											{
+												"type": "Ready",
+												"status": "True"
+											}
+										]
+									}
+								}`),
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				rsp: &fnv1.RunFunctionResponse{
+					Desired: &fnv1.State{
+						Composite: &fnv1.Resource{
+							Resource: resource.MustStructJSON(`{
+								"apiVersion": "test.crossplane.io/v1",
+								"kind": "TestXR",
+								"metadata": {
+									"name": "my-test-xr",
+									"labels": {
+										"protection.fn.crossplane.io/block-deletion": "true"
+									}
+								}
+							}`),
+						},
+						Resources: map[string]*fnv1.Resource{
+							"ready-composed-resource": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "test.crossplane.io/v1",
+									"kind": "TestComposed",
+									"metadata": {
+										"name": "my-test-composed"
+									},
+									"spec": {},
+									"status": {
+										"conditions": [
+											{
+												"type": "Ready",
+												"status": "True"
+											}
+										]
+									}
+								}`),
+							},
+							"xr-my-test-xr-usage": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "apiextensions.crossplane.io/v1beta1",
+									"kind": "Usage",
+									"metadata": {
+										"name": "my-test-xr-cf831c-fn-protection"
+									},
+									"spec": {
+										"of": {
+											"apiVersion": "test.crossplane.io/v1",
+											"kind": "TestXR",
+											"resourceRef": {
+												"name": "my-test-xr"
+											}
+										},
+										"reason": "created by function-deletion-protection via label protection.fn.crossplane.io/block-deletion"
+									}
+								}`),
+							},
+						},
+					},
+					Meta:       &fnv1.ResponseMeta{Tag: "hello", Ttl: durationpb.New(1 * time.Minute)},
+					Results:    []*fnv1.Result{},
+					Conditions: []*fnv1.Condition{},
+				},
+			},
+		},
+		"ProtectCompositeResourceWithV1UsageWhenProtectedResourcesExist": {
+			reason: "V1 Usage Created for a Composite when CreateV1Usages is true and protected composed resources exist",
+			args: args{
+				req: &fnv1.RunFunctionRequest{
+					Meta: &fnv1.RequestMeta{Tag: "hello"},
+					Input: resource.MustStructJSON(`{
+						"apiVersion": "template.fn.crossplane.io/v1beta1",
+						"kind": "Input",
+						"enableV1Mode": true
+					}`),
+					Desired: &fnv1.State{
+						Composite: &fnv1.Resource{
+							Resource: resource.MustStructJSON(`{
+								"apiVersion": "test.crossplane.io/v1",
+								"kind": "TestXR",
+								"metadata": {
+									"name": "my-test-xr"
+								}
+							}`),
+						},
+						Resources: map[string]*fnv1.Resource{
+							"ready-composed-resource": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "test.crossplane.io/v1",
+									"kind": "TestComposed",
+									"metadata": {
+										"name": "my-test-composed",
+										"labels": {
+											"protection.fn.crossplane.io/block-deletion": "true"
+										}
+									},
+									"spec": {},
+									"status": {
+										"conditions": [
+											{
+												"type": "Ready",
+												"status": "True"
+											}
+										]
+									}
+								}`),
+							},
+						},
+					},
+					Observed: &fnv1.State{
+						Composite: &fnv1.Resource{
+							Resource: resource.MustStructJSON(`{
+								"apiVersion": "test.crossplane.io/v1",
+								"kind": "TestXR",
+								"metadata": {
+									"name": "my-test-xr"
+								}
+							}`),
+						},
+						Resources: map[string]*fnv1.Resource{
+							"ready-composed-resource": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "test.crossplane.io/v1",
+									"kind": "TestComposed",
+									"metadata": {
+										"name": "my-test-composed"
+									},
+									"spec": {},
+									"status": {
+										"conditions": [
+											{
+												"type": "Ready",
+												"status": "True"
+											}
+										]
+									}
+								}`),
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				rsp: &fnv1.RunFunctionResponse{
+					Desired: &fnv1.State{
+						Composite: &fnv1.Resource{
+							Resource: resource.MustStructJSON(`{
+								"apiVersion": "test.crossplane.io/v1",
+								"kind": "TestXR",
+								"metadata": {
+									"name": "my-test-xr"
+								}
+							}`),
+						},
+						Resources: map[string]*fnv1.Resource{
+							"ready-composed-resource": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "test.crossplane.io/v1",
+									"kind": "TestComposed",
+									"metadata": {
+										"name": "my-test-composed",
+										"labels": {
+											"protection.fn.crossplane.io/block-deletion": "true"
+										}
+									},
+									"spec": {},
+									"status": {
+										"conditions": [
+											{
+												"type": "Ready",
+												"status": "True"
+											}
+										]
+									}
+								}`),
+							},
+							"ready-composed-resource-usage": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "apiextensions.crossplane.io/v1beta1",
+									"kind": "Usage",
+									"metadata": {
+										"name": "my-test-composed-d9bc46-fn-protection"
+									},
+									"spec": {
+										"of": {
+											"apiVersion": "test.crossplane.io/v1",
+											"kind": "TestComposed",
+											"resourceRef": {
+												"name": "my-test-composed"
+											}
+										},
+										"reason": "created by function-deletion-protection via label protection.fn.crossplane.io/block-deletion"
+									}
+								}`),
+							},
+							"xr-my-test-xr-usage": {
+								Resource: resource.MustStructJSON(`{
+									"apiVersion": "apiextensions.crossplane.io/v1beta1",
+									"kind": "Usage",
+									"metadata": {
+										"name": "my-test-xr-cf831c-fn-protection"
+									},
+									"spec": {
+										"of": {
+											"apiVersion": "test.crossplane.io/v1",
+											"kind": "TestXR",
+											"resourceRef": {
+												"name": "my-test-xr"
+											}
+										},
+										"reason": "created by function-deletion-protection via label protection.fn.crossplane.io/block-deletion"
+									}
+								}`),
+							},
+						},
+					},
+					Meta:       &fnv1.ResponseMeta{Tag: "hello", Ttl: durationpb.New(1 * time.Minute)},
+					Results:    []*fnv1.Result{},
+					Conditions: []*fnv1.Condition{},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
