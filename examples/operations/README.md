@@ -10,6 +10,15 @@ and block deletion of the Namespace.
 Note that Operations can only create and modify resources. Any `Usages` or `ClusterUsages` created by
 this Operation need to be deleted manually before protected resources can be deleted.
 
+## Reason Strings for Operations
+
+The function uses different reason strings to distinguish between protection types:
+
+- **WatchOperation Protection**: Resources matched by a `WatchOperation` automatically get protected with the reason `created by function-deletion-protection by a WatchOperation` (see `crossplane-system` namespace example below)
+- **Operation with Label Protection**: Resources in an Operation's required resources that have the `protection.fn.crossplane.io/block-deletion: "true"` label get the reason `created by function-deletion-protection by an Operation` (see `kube-system` namespace example below)
+
+This distinction makes it clear whether protection was triggered automatically by a watch condition or explicitly via a label.
+
 ## Running  This Example on a Crossplane Cluster
 
 ### Installing the Function

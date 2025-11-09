@@ -70,6 +70,17 @@ The label can be applied to the resource in the Composition (the "Desired" state
 Resource in the cluster (the "Observed" state). If the Desired and Observed labels conflict, the function will
 default to creating the Usage.
 
+### Usage Reason Strings
+
+The function provides granular reason strings to help identify why a Usage was created:
+
+- **`created by function-deletion-protection via label protection.fn.crossplane.io/block-deletion`** - A resource was protected because it has the `protection.fn.crossplane.io/block-deletion: "true"` label
+- **`created by function-deletion-protection because a composed resource is protected`** - A Composite resource was protected because one of its composed resources is protected
+- **`created by function-deletion-protection by an Operation`** - A resource was protected by a regular Operation (with the label)
+- **`created by function-deletion-protection by a WatchOperation`** - A resource was protected by a WatchOperation (automatic protection)
+
+These reason strings appear in the Usage's `spec.reason` field and in deletion rejection messages, making it easy to understand why a resource cannot be deleted.
+
 ## Running as an Operation
 
 When invoked by a [`WatchOperation`](https://docs.crossplane.io/latest/operations/watchoperation/) any Kubernetes

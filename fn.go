@@ -40,7 +40,7 @@ const (
 	ProtectionV1GroupVersion               = apiextensionsv1beta1.Group + "/" + apiextensionsv1beta1.Version
 	// UsageNameSuffix is the suffix applied when generating Usage names.
 	UsageNameSuffix = "fn-protection"
-	// RequirementsNameWatchedResource
+	// RequirementsNameWatchedResource is the name passed by a WatchOperation.
 	RequirementsNameWatchedResource = "ops.crossplane.io/watched-resource"
 )
 
@@ -145,7 +145,7 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1.RunFunctionRequest) 
 			return rsp, nil
 		}
 		maps.Copy(desiredComposed, rr)
-		protectedCount = protectedCount + len(rr)
+		protectedCount += len(rr)
 	}
 
 	if err := response.SetDesiredComposedResources(rsp, desiredComposed); err != nil {

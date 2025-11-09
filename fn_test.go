@@ -557,7 +557,7 @@ func TestRunFunction(t *testing.T) {
 												"name": "my-test-xr"
 											}
 										},
-										"reason": "created by function-deletion-protection by a protected child resource"
+										"reason": "created by function-deletion-protection because a composed resource is protected"
 									}
 								}`),
 							},
@@ -711,7 +711,7 @@ func TestRunFunction(t *testing.T) {
 												"name": "my-test-xr"
 											}
 										},
-										"reason": "created by function-deletion-protection by a protected child resource"
+										"reason": "created by function-deletion-protection because a composed resource is protected"
 									}
 								}`),
 							},
@@ -875,7 +875,7 @@ func TestRunFunction(t *testing.T) {
 												"name": "my-test-xr"
 											}
 										},
-										"reason": "created by function-deletion-protection by a protected child resource"
+										"reason": "created by function-deletion-protection because a composed resource is protected"
 									}
 								}`),
 							},
@@ -1190,7 +1190,7 @@ func TestRunFunction(t *testing.T) {
 												"name": "my-test-xr"
 											}
 										},
-										"reason": "created by function-deletion-protection by a protected child resource"
+										"reason": "created by function-deletion-protection because a composed resource is protected"
 									}
 								}`),
 							},
@@ -1272,7 +1272,7 @@ func TestProtectRequiredResources(t *testing.T) {
 									"apiVersion": ProtectionGroupVersion,
 									"kind":       "ClusterUsage",
 									"metadata": map[string]any{
-										"name": "testresource-test-watched-resource-4eae99-fn-protection",
+										"name": "testresource-test-watched-resource-bcd955-fn-protection",
 									},
 									"spec": map[string]any{
 										"of": map[string]any{
@@ -1323,7 +1323,7 @@ func TestProtectRequiredResources(t *testing.T) {
 									"apiVersion": ProtectionGroupVersion,
 									"kind":       "ClusterUsage",
 									"metadata": map[string]any{
-										"name": "testresource-test-labeled-resource-5584e4-fn-protection",
+										"name": "testresource-test-labeled-resource-d0dacf-fn-protection",
 									},
 									"spec": map[string]any{
 										"of": map[string]any{
@@ -1396,7 +1396,7 @@ func TestProtectRequiredResources(t *testing.T) {
 									"apiVersion": ProtectionGroupVersion,
 									"kind":       "Usage",
 									"metadata": map[string]any{
-										"name":      "testresource-test-watched-resource-4eae99-fn-protection",
+										"name":      "testresource-test-watched-resource-bcd955-fn-protection",
 										"namespace": "test-namespace",
 									},
 									"spec": map[string]any{
@@ -1472,7 +1472,7 @@ func TestProtectRequiredResources(t *testing.T) {
 									"apiVersion": ProtectionGroupVersion,
 									"kind":       "ClusterUsage",
 									"metadata": map[string]any{
-										"name": "testresource-watched-resource-1-35e01a-fn-protection",
+										"name": "testresource-watched-resource-1-915899-fn-protection",
 									},
 									"spec": map[string]any{
 										"of": map[string]any{
@@ -1495,7 +1495,7 @@ func TestProtectRequiredResources(t *testing.T) {
 									"apiVersion": ProtectionGroupVersion,
 									"kind":       "ClusterUsage",
 									"metadata": map[string]any{
-										"name": "testresource-watched-resource-2-7b3544-fn-protection",
+										"name": "testresource-watched-resource-2-47c204-fn-protection",
 									},
 									"spec": map[string]any{
 										"of": map[string]any{
@@ -1518,7 +1518,7 @@ func TestProtectRequiredResources(t *testing.T) {
 									"apiVersion": ProtectionGroupVersion,
 									"kind":       "ClusterUsage",
 									"metadata": map[string]any{
-										"name": "testresource-labeled-resource-5d2a02-fn-protection",
+										"name": "testresource-labeled-resource-b3e5fe-fn-protection",
 									},
 									"spec": map[string]any{
 										"of": map[string]any{
